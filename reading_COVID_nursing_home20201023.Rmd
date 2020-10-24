@@ -8,20 +8,83 @@ output:
   pdf_document: default
 ---
 
-```{r setup, include=FALSE}
-library("formattable")
-library("survey")
-library("questionr")
-library("dplyr")
-library("descr")
-library("data.table")
+```{r setup, include=FALSE, echo=FALSE}
+
+packs <- c('formattable'
+           ,'survey'
+           ,'questionr'
+           , 'dplyr'
+           ,'descr'
+           ,'data.table'
+           ,'RSocrata')
+
+
+
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(char = packs)
+
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Program that reads CMS nursing home data and performs weighted tables
 
 ```{r read admissions dataset}
-mydata <- read.csv("/Users/haroldpollack/Downloads/COVID-19_Nursing_Home_Dataset20201023.csv")
+
+#grab data using RSocrata
+#will need an api token define it here, get one at https://dev.socrata.com/docs/app-tokens.html or https://support.socrata.com/hc/en-us/articles/210138558-Generating-an-App-Token
+
+#if you create a global variable .Renviron in your home directory to take you to the directory you want to work in you can use the following lines of code to use that and be in the right directory to access local files
+
+if(file.exists(Sys.getenv('NURSING_HOME_WD'))){
+  mywd <- Sys.getenv('NURSING_HOME_WD')
+  print(file.exists(Sys.getenv('NURSING_HOME_WD')))
+}
+
+#this relies on your dataset having this name
+if(exists('mywd')){
+  mydata <- read.csv(paste(mywd,"COVID-19_Nursing_Home_Dataset20201023.csv",sep=''))
+}else{
+  
+  #put in your path to file if you want to use local file and did not set up .Renviron
+  if(file.exists("/Users/haroldpollack/Downloads/COVID-19_Nursing_Home_Dataset20201023.csv")){
+    
+    mydata <- read.csv("/Users/haroldpollack/Downloads/COVID-19_Nursing_Home_Dataset20201023.csv")
+
+  }else{
+
+    #you can put your token in an .Renviron file that can be put in your home directory
+    #if you name the token as done below, then you can use the following command
+    
+    if(!exists('token')){
+      if(file.exists(Sys.getenv('SOCRATA_TOKEN'))){
+      mywd <- Sys.getenv('SOCRATA_TOKEN')
+      print(file.exists(Sys.getenv('SOCRATA_TOKEN')))
+      }
+      else{
+      token <- NA}
+    }
+    
+    endpoint <- 'https://data.cms.gov/resource/s2uc-8wxp.json'
+    url <- 'https://data.cms.gov/resource/s2uc-8wxp.json?$limit=50000&$offset=0'
+    start_row<- 0
+    mydata <- read.socrata(url)
+    new_df_len <- nrow(df)
+    
+    if(!is.na(token)){
+    # '''
+    # Fill in with code for people with tokens if they can get them?
+    # '''
+    }else{
+      while(new_df_len > 1)
+      start_row <- start_row +50000
+      url <- paste0(endpoint,'$limit=50000','&$offset=',start_row,'&$order=Week Ending')
+      new_df <- read.socrata(url)
+      new_df_len <- nrow(new_df)
+      mydata <- rbind(df, mydata)
+    }
+  }
+}
+
 #str(mydata)
 table(mydata$Week.Ending)
 aggregate(mydata$Staff.Weekly.COVID.19.Deaths, by=list(Category=mydata$Week.Ending), na.rm=TRUE, FUN=sum)

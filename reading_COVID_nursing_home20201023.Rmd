@@ -55,36 +55,57 @@ if(exists('mywd')){
     #you can put your token in an .Renviron file that can be put in your home directory
     #if you name the token as done below, then you can use the following command
     
-    if(!exists('token')){
-      if(file.exists(Sys.getenv('SOCRATA_TOKEN'))){
-      mywd <- Sys.getenv('SOCRATA_TOKEN')
-      print(file.exists(Sys.getenv('SOCRATA_TOKEN')))
-      }
-      else{
-      token <- NA}
-    }
     
+    if(nchar(Sys.getenv('SOCRATA_TOKEN'))>1){
+    token <- Sys.getenv('SOCRATA_TOKEN')
+    email<- Sys.getenv('SOCRATA_EMAIL')
+    pass<- Sys.getenv('SOCRATA_PASS')
+    print(file.exists(Sys.getenv('SOCRATA_TOKEN')))
+    
+    endpoint <- 'https://data.cms.gov/resource/s2uc-8wxp.json'
+    #note that I messed with this to grab Wiscsonsin nursing homes only
+    url <- paste0(endpoint,'?$limit=50000','&provider_state=WI&$offset=0&$order=week_ending')
+    start_row<- 0
+    mydata <- read.socrata(url,app_token = token,
+  email     = email,
+  password  = pass)
+    new_df_len <- nrow(mydata)
+    }
+    else{
+    token <- NA
     endpoint <- 'https://data.cms.gov/resource/s2uc-8wxp.json'
     url <- 'https://data.cms.gov/resource/s2uc-8wxp.json?$limit=50000&$offset=0'
     start_row<- 0
     mydata <- read.socrata(url)
-    new_df_len <- nrow(df)
+    new_df_len <- nrow(mydata)}
+    
+    
+    
     
     if(!is.na(token)){
     # '''
     # Fill in with code for people with tokens if they can get them?
     # '''
-    }else{
-      while(new_df_len > 1)
+      while(new_df_len >= 50000){
       start_row <- start_row +50000
-      url <- paste0(endpoint,'$limit=50000','&$offset=',start_row,'&$order=Week Ending')
+      url <- paste0(endpoint,'?$$app_token=',token,'$limit=50000','&provider_state=WI&$offset=',start_row,'&$order=week_ending')
+      new_df <- read.socrata(url,app_token = token,
+  email     = email,
+  password  = pass)
+      new_df_len <- nrow(new_df)
+      mydata <- rbind(new_df, mydata)
+      }
+    }else{
+      while(new_df_len >= 50000){
+      start_row <- start_row +50000
+      url <- paste0(endpoint,'$limit=50000','&Provider State=WI&$offset=',start_row,'&$order=Week Ending')
       new_df <- read.socrata(url)
       new_df_len <- nrow(new_df)
-      mydata <- rbind(df, mydata)
+      mydata <- rbind(new_df, mydata)
+      }
     }
   }
 }
-
 #str(mydata)
 table(mydata$Week.Ending)
 aggregate(mydata$Staff.Weekly.COVID.19.Deaths, by=list(Category=mydata$Week.Ending), na.rm=TRUE, FUN=sum)
